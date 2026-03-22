@@ -3,7 +3,10 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
-{
+{   
+
+    #region Variables
+
     [Header("DEBUG")]
     [SerializeField] private float currentGravity;
     [SerializeField] private bool infiniteJump;
@@ -17,8 +20,10 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Reference")]
     [SerializeField] private Rigidbody2D rb;
-    [SerializeField] private GameObject groundChecker;
+    [SerializeField] private Transform groundChecker;
     [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private Transform wallCheck;
+    [SerializeField] private LayerMask wallLayer;
     [Space]
 
     [Header("Movement Settings")]
@@ -33,16 +38,39 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float maxFallSpeed = 50f;
     [Space]
 
+    private bool isWallSliding;
+    private float wallSlidingSpeed = 2f;
+
+    private bool isWallJumping;
+    private float wallJumpingDirection;
+    [SerializeField] private float wallJumpingTime = 0.2f;
+     private float wallJumpingCounter;
+    [SerializeField] private float wallJumpingDuration = 0.4f;
+    [SerializeField] private Vector2 wallJumpingPower = new Vector2(8f, 16f);
+
     private float horizontal;
+
+    #endregion
+
+    #region Unity Methods
 
     void FixedUpdate()
     {
-
         //Movement stuff----------------------------------
-        rb.linearVelocity = new Vector2(horizontal * moveSpeed, rb.linearVelocity.y);
+
+        if (!isWallJumping)
+        {
+            rb.linearVelocity = new Vector2(horizontal * moveSpeed, rb.linearVelocity.y);
+        }
+        
 
         //Jumping stuff----------------------------------
         groundCheck();
+
+        if (!isWallJumping)
+        {
+            rb.linearVelocity = new Vector2(horizontal * moveSpeed, rb.linearVelocity.y);
+        }
 
         //Fall faster
         if (rb.linearVelocity.y < 0)
@@ -70,22 +98,27 @@ public class PlayerMovement : MonoBehaviour
         //DEBUG MONITOR stuff----------------------------------
         currentGravity = rb.gravityScale;
 
-        //Flip the player based on movement direction
-        if (horizontal > 0 && !isFacingRight)
+        WallSlide();
+        WallJump();
+
+        if (!isWallJumping)
         {
-            Flip();
-        }
-        else if (horizontal < 0 && isFacingRight)
-        {
-            Flip();
+            //Flip the player based on movement direction
+            if (horizontal > 0 && !isFacingRight)
+            {
+                Flip();
+            }
+            else if (horizontal < 0 && isFacingRight)
+            {
+                Flip();
+            }
         }
     }
 
+    #endregion
+
     private void Flip()
     {
-        // SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
-        // spriteRenderer.flipX = !spriteRenderer.flipX; // Flip the sprite horizontally
-
         isFacingRight = !isFacingRight;
         Vector3 scale = transform.localScale;
         scale.x *= -1; // Flip the x scale to mirror the sprite
@@ -118,10 +151,69 @@ public class PlayerMovement : MonoBehaviour
     private void groundCheck()
     {
         // Check if the player is grounded using a circle overlap
-        isGrounded = Physics2D.OverlapCircle(groundChecker.transform.position, 0.1f, groundLayer);
+        isGrounded = Physics2D.OverlapCircle(groundChecker.position, 0.1f, groundLayer);
     }
 
     #endregion
+
+    #region Wall Jump
+
+    private bool IsWalled()
+    {
+        return Physics2D.OverlapCircle(wallCheck.position, 0.2f, wallLayer);
+    }
+
+    private void WallSlide()
+    {
+        if (IsWalled() && !isGrounded && horizontal != 0f)
+        {
+            isWallSliding = true;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Clamp(rb.linearVelocity.y, -wallSlidingSpeed, float.MaxValue));
+        }
+        else
+        {
+            isWallSliding = false;
+        }
+    }
+
+    private void WallJump()
+    {
+        if (isWallSliding)
+        {
+            isWallJumping = false;
+            wallJumpingDirection = -transform.localScale.x;
+            wallJumpingCounter = wallJumpingTime;
+
+            CancelInvoke(nameof(StopWallJumping));
+        }
+        else
+        {
+            wallJumpingCounter -= Time.deltaTime;
+        }
+
+        if (Input.GetButtonDown("Jump") && wallJumpingCounter > 0f)
+        {
+            isWallJumping = true;
+            rb.linearVelocity = new Vector2(wallJumpingDirection * wallJumpingPower.x, wallJumpingPower.y);
+            wallJumpingCounter = 0f;
+
+            if (transform.localScale.x != wallJumpingDirection)
+            {
+                Flip();
+            }
+
+            Invoke(nameof(StopWallJumping), wallJumpingDuration);
+        }
+    }
+
+    private void StopWallJumping()
+    {
+        isWallJumping = false;
+    }
+
+    #endregion
+
+    #region Movement
 
     //move
     public void Move(InputAction.CallbackContext context)
@@ -130,9 +222,15 @@ public class PlayerMovement : MonoBehaviour
         horizontal = context.ReadValue<Vector2>().x;
     }
 
+    #endregion
+
+    #region Others
+
     //set gravity
     public void SetGravityScale(float scale)
 	{
 		rb.gravityScale = scale;
 	}
+
+    #endregion
 }
