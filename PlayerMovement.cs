@@ -81,19 +81,18 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void groundCheck()
-    {
-        // Check if the player is grounded using a circle overlap
-        isGrounded = Physics2D.OverlapCircle(groundChecker.transform.position, 0.1f, groundLayer);
-    }
-
     private void Flip()
     {
+        // SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
+        // spriteRenderer.flipX = !spriteRenderer.flipX; // Flip the sprite horizontally
+
         isFacingRight = !isFacingRight;
         Vector3 scale = transform.localScale;
         scale.x *= -1; // Flip the x scale to mirror the sprite
         transform.localScale = scale;
     }
+
+    #region Jump
 
     //jump
     public void Jump(InputAction.CallbackContext context)
@@ -108,16 +107,21 @@ public class PlayerMovement : MonoBehaviour
         {
             rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
         }
-    }
-
-    public void StopJump(InputAction.CallbackContext context)
-    {
+        
         if (context.canceled && rb.linearVelocity.y > 0)
         {
             // Reduce upward velocity for variable jump height
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
         }
     }
+
+    private void groundCheck()
+    {
+        // Check if the player is grounded using a circle overlap
+        isGrounded = Physics2D.OverlapCircle(groundChecker.transform.position, 0.1f, groundLayer);
+    }
+
+    #endregion
 
     //move
     public void Move(InputAction.CallbackContext context)
